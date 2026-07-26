@@ -83,7 +83,7 @@ Además, algunas variables relevantes del rendimiento futbolístico no se incorp
 
 - `MBAPPE ANALISIS ESTADISTICO PDF.pdf`: presentación del análisis.
 - `README.md`: descripción general del proyecto.
-- `datos/`: carpeta destinada a los datos utilizados, si se incorporan posteriormente.
+- `mbappe_datos_excel`: Base de datos en Excel utilizada para el proyecto, recogida por mi.
 - `codigo/`: carpeta destinada al código de análisis en R, si se incorpora posteriormente.
 - `graficos/`: carpeta destinada a las visualizaciones principales del proyecto.
 
