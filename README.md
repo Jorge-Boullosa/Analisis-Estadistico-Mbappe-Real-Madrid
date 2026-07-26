@@ -81,7 +81,7 @@ Además, algunas variables relevantes del rendimiento futbolístico no se incorp
 
 ## Archivos del repositorio
 
-- `mbappe_rendimiento_real_madrid.pdf`: presentación del análisis.
+- `MBAPPE ANALISIS ESTADISTICO PDF.pdf`: presentación del análisis.
 - `README.md`: descripción general del proyecto.
 - `datos/`: carpeta destinada a los datos utilizados, si se incorporan posteriormente.
 - `codigo/`: carpeta destinada al código de análisis en R, si se incorpora posteriormente.
