@@ -1,0 +1,249 @@
+# ============================================================
+# Análisis del rendimiento de Mbappé en el Real Madrid
+# Autor: Jorge Boullosa Conde
+# Técnicas: descriptivos, contrastes de hipótesis y regresión logística
+# ============================================================
+
+library(readxl)
+df <- read_excel("datos/mbappe_datos_excel.xlsx")
+str(df)
+
+###estadísticas personales
+
+sum(df$min>0) # partidos jugados
+sum(df$juega) # partidos jugados al menos 30 min
+sum(df$gol) # goles marcados
+sum(df$asist) # asistencias dadas
+sum(df$gol)/sum(df$min>0) # goles/partido
+sum(df$gol>0) # partidos distintos con gol 
+sum(df$gol>0)/sum(df$juega) # proporcion de gol entre todos los partidos que jugó
+
+
+df$favor_menos<- df$a_favor-df$gol-df$asist
+df$hubiesen_ganado<- ifelse(df$favor_menos>df$en_contra,1,0)
+sum(df$victoria)-sum(df$hubiesen_ganado) #veces que rescata al madrid
+
+
+
+###estadísticas equipo
+
+nrow(df) # partidos
+sum(df$victoria) # victorias
+sum(df$victoria)/nrow(df) # proporcion de victorias
+sum(df$a_favor) # goles a favor
+sum(df$en_contra) # goles en contra
+
+mean(df$a_favor[df$juega== 0], na.rm = TRUE) # goles a favor sin Mbappe por partido
+mean(df$a_favor[df$juega == 1], na.rm = TRUE) # goles a favor con Mbappe por partido
+mean(df$en_contra[df$juega== 0], na.rm = TRUE) # goles en contra sin Mbappe por partido
+mean(df$en_contra[df$juega== 1], na.rm = TRUE) # goles en contra con Mbappe por partido
+
+
+partidos_con <- 40
+partidos_sin <- 16
+goles_favor_con <- 83
+goles_favor_sin <- 36
+goles_contra_con <- 44
+goles_contra_sin <- 20
+
+test_favor <- poisson.test(
+  x = c(goles_favor_con, goles_favor_sin),
+  T = c(partidos_con, partidos_sin)
+)
+test_favor # Test de Poisson para goles a favor - no significativo
+
+
+test_contra <- poisson.test(
+  x = c(goles_contra_con, goles_contra_sin),
+  T = c(partidos_con, partidos_sin)
+)
+test_contra # Test de Poisson para goles en contra - no significativo
+
+
+
+### gráficos
+
+table(df$juega, df$victoria)
+tabla <- matrix(c(13, 5,
+                  27, 11),
+                nrow = 2, byrow = TRUE)
+rownames(tabla) <- c("Derrota", "Victoria")
+colnames(tabla) <- c("Juega", "No_juega")
+tabla # tabla contingencia victoria ~ juega
+
+
+library(ggplot2)
+ggplot(df, aes(x = factor(juega), fill = factor(victoria))) +  # gráfico juega ~ victoria
+  geom_bar(position = "fill") +
+  labs(x = "Juega",
+       y = "Proporción",
+       fill = "Victoria") +
+  scale_y_continuous(labels = scales::percent)
+
+
+ggplot(df, aes(x = gol, fill = factor(victoria))) + # gráfico goles ~ victoria
+  geom_bar(position = "fill") +
+  labs(x = "Goles",
+       y = "Proporción",
+       fill = "Victoria") +
+  scale_y_continuous(labels = scales::percent)
+
+
+b<- df[df$gol==0,]
+ggplot(b, aes(x = factor(juega), fill = factor(victoria))) +
+  geom_bar(position = "fill") +
+  labs(x = "Juega",
+       y = "Proporción",
+       fill = "Victoria") +
+  scale_y_continuous(labels = scales::percent) # gráfico juega [con goles = 0] ~ victoria
+
+
+a<- df[df$juega==1,]
+a$marca<- ifelse(a$gol>0,1,0)
+table(a$marca, a$victoria) # tabla marca o no (jugando) y victorias
+
+tabla_marca <- matrix(
+  c(23, 5,
+    4, 8),
+  nrow = 2,
+  byrow = TRUE
+)
+rownames(tabla_marca) <- c("Marca", "No marca")
+colnames(tabla_marca) <- c("Victoria", "No victoria")
+tabla_marca
+
+test_marca <- fisher.test(tabla_marca)
+test_marca # Test de Fisher entre las diferencias de victorias cuando Mbappé juega y no marca y cuando no juega
+# Significativo (pvalor = 0.0075)
+
+
+
+impacto_gol <- data.frame(
+  Situacion = c("Juega y marca", "Juega y no marca"),
+  Victorias = c(23, 4),
+  Partidos = c(28, 12)
+)
+impacto_gol$Porcentaje <- impacto_gol$Victorias / impacto_gol$Partidos
+
+ggplot(impacto_gol, aes(x = Situacion, y = Porcentaje)) + # grafico de % de victorias cuando marca o no (jugando)
+  geom_col() +
+  geom_text(
+    aes(label = paste0(round(Porcentaje * 100, 1), "%")),
+    vjust = -0.4,
+    size = 6
+  ) +
+  scale_y_continuous(
+    labels = function(x) paste0(x * 100, "%"),
+    limits = c(0, 1)
+  ) +
+  labs(
+    title = "Porcentaje de victorias cuando Mbappé marca o no marca",
+    subtitle = "Solo partidos en los que Mbappé juega al menos 30 minutos",
+    x = "",
+    y = "Porcentaje de victorias"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+
+### situacion
+
+tabla_3_grupos <- matrix(
+  c(11, 5,
+    4, 8,
+    23, 5),
+  nrow = 3,
+  byrow = TRUE
+)
+rownames(tabla_3_grupos) <- c("No juega", "Juega y no marca", "Juega y marca")
+colnames(tabla_3_grupos) <- c("Victoria", "No victoria")
+tabla_3_grupos
+
+
+chisq.test(tabla_3_grupos) # Test chi-cuadrado - significativo, hay diferencias claras
+# Test exacto de Fisher, más prudente con muestras pequeñas
+fisher.test(tabla_3_grupos)
+
+
+tabla_3_grupos_n<- as.data.frame(tabla_3_grupos)
+tabla_3_grupos_n[1,3]<- 0.687
+tabla_3_grupos_n[2,3]<- 0.333
+tabla_3_grupos_n[3,3]<- 0.821
+colnames(tabla_3_grupos_n) <- c("Victoria", "No victoria","Proporción")
+tabla_3_grupos_n
+
+tabla_3_grupos_nn<- tabla_3_grupos_n
+tabla_3_grupos_nn[4,]<- tabla_3_grupos_nn[3,]
+tabla_3_grupos_nn[3,]<- tabla_3_grupos_nn[2,]
+tabla_3_grupos_nn[2,]<- tabla_3_grupos_nn[1,]
+tabla_3_grupos_nn[1,1]<- 38
+tabla_3_grupos_nn[1,2]<- 18
+tabla_3_grupos_nn[1,3]<- 0.678
+rownames(tabla_3_grupos_nn) <- c("Real Madrid 25/26","No juega", "Juega y no marca", "Juega y marca")
+colnames(tabla_3_grupos_nn) <- c("Victoria", "No victoria","Proporción")
+tabla_3_grupos_nn
+
+
+tabla_no_vs_no_marca <- matrix(
+  c(11, 5,
+    4, 8),
+  nrow = 2,
+  byrow = TRUE
+)
+fisher.test(tabla_no_vs_no_marca) # Test de Fisher para No juega vs juega y no marca - No significativo - poca muestra
+
+
+tabla_no_vs_no_marca_mundialclubes<- matrix(
+  c(13, 6,
+    5, 9),
+  nrow = 2,
+  byrow = TRUE
+)
+fisher.test(tabla_no_vs_no_marca_mundialclubes) # añadiendo los partidos del mundial de clubes, disminuye
+# considerablemente el p-valor, así que es probable que se deba a que haya una muestra pequeña el porqué no es
+# significativa la diferencia.
+
+
+tabla_no_vs_marca <- matrix(
+  c(11, 5,
+    23, 5),
+  nrow = 2,
+  byrow = TRUE
+)
+fisher.test(tabla_no_vs_marca) # No juega vs juega y marca - No significativo
+
+
+
+####modelo
+
+df$victoria<- factor(df$victoria) # pasamos a factores las variables para la regresión
+df$juega<- factor(df$juega)
+df$nivel<- factor(df$nivel)
+df$local_visitante<- factor(df$local_visitante)
+
+
+modelo1 <- glm(victoria ~ competicion+local_visitante+nivel+juega+gol+asist,
+              data = df,
+              family = binomial)
+modelo2<- glm(victoria ~ local_visitante+nivel+juega+gol,
+               data = df,
+               family = binomial)
+
+summary(modelo1)
+summary(modelo2)  # nos quedamos con el segundo modelo que explica mejor y es más simple (menos ruido)
+
+
+
+#funcion para hallar probabilidades
+
+calc<- function(f,m,v,j,g){
+  z<- 0.7822+f*1.2448+m*2.1441-j*2.0632+g*1.8988-v*1.5309
+  prob<- 1/(1+exp(-z))
+  prob
+}
+
+calc(0,1,0,1,1) # partido media dificultad, de local, juega Mbappé y marca 1 gol
+calc(0,0,1,1,1) # contra Bayern de Munich, fuera de casa, juega Mbappé y marca un gol (realidad)
+calc(0,0,1,0,0) # contra Bayern de Munich, fuera de casa y sin Mbappé
+calc(1,0,0,0,0) # contra Girona, en casa y sin Mbappé
+calc(1,0,0,1,0) # contra Girona, en casa, juega Mbappé pero no marca (realidad)
